@@ -25,4 +25,5 @@ class DecattLoss(nn.Module):
         ce_loss = self.ce_loss(outputs, targets)
         decatt_loss = self.correlation_loss(attentions)
 
-        return ce_loss + self.lam * decatt_loss
+#         return ce_loss + self.lam * decatt_loss
+        return ce_loss, self.lam * decatt_loss

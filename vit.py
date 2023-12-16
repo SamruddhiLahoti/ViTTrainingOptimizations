@@ -101,8 +101,13 @@ class VisionTransformer(nn.Module):
         self.embed_len = self.patch_embed.num_patches + 1
         self.pos_embed = nn.Parameter(torch.zeros(1, self.embed_len, embed_dim))
         self.dropout = nn.Dropout(dropout)
-        self.transformer_blocks = nn.Sequential(*[
-            TransformerBlock(embed_dim, num_heads, mlp_dim, dropout) for i in range(num_layers)
+        
+        self.transformer1 = nn.Sequential(*[
+            TransformerBlock(embed_dim, num_heads, mlp_dim, dropout) for i in range(3)
+        ])
+        
+        self.transformer2 = nn.Sequential(*[
+            TransformerBlock(embed_dim, num_heads, mlp_dim, dropout) for i in range(3, num_layers)
         ])
         self.norm = nn.LayerNorm(embed_dim)
         self.cls_head = nn.Sequential(nn.Linear(embed_dim, embed_dim//2),
@@ -118,10 +123,9 @@ class VisionTransformer(nn.Module):
         x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
         x = x + self.pos_embed
         # x = self.dropout(x)
-#         for block in self.transformer_blocks:
-#             x = block(x)
         # x = self.norm(x)
-        A = self.transformer_blocks(x)
+        A = self.transformer1(x)
+        A = self.transformer2(A)
         x = self.cls_head(A[:, 0])
 
         return x, A
