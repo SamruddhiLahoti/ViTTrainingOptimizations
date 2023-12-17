@@ -38,8 +38,8 @@ def cifar100_loaders(image_size, batch_size):
         transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
     ])
 
-    trainset = torchvision.datasets.CIFAR100(root='./data', train=True, download=False, transform=transform_train)
-    testset = torchvision.datasets.CIFAR100(root='./data', train=False, download=False, transform=transform_test)
+    trainset = datasets.CIFAR100(root='./data', train=True, download=False, transform=transform_train)
+    testset = datasets.CIFAR100(root='./data', train=False, download=False, transform=transform_test)
 
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=1)
     testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=1)

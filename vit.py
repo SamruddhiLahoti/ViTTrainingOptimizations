@@ -125,8 +125,8 @@ class VisionTransformer(nn.Module):
         # x = self.dropout(x)
         # x = self.norm(x)
         A = self.transformer1(x)
-        A = self.transformer2(A)
-        x = self.cls_head(A[:, 0])
+        x = self.transformer2(A)
+        x = self.cls_head(x[:, 0])
 
         return x, A
 
