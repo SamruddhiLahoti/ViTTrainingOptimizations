@@ -59,7 +59,7 @@ def train(path, model, criterion, optimizer1, num_epochs, trainloader, testloade
             else:
                 ce_loss = criterion(outputs, labels.to("cuda") )
                 decatt_loss = torch.tensor(0)
-
+            
             ce_loss.backward(retain_graph=True)
             optimizer1.step()
             
