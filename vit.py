@@ -27,7 +27,6 @@ class PatchEmbedding(nn.Module):
         self.norm = nn.LayerNorm(self.embed_dim)
 
     def forward(self, x):
-        # TODO
         x = self.proj(x)
         x = x.flatten(2).transpose(1, 2)
         x = self.norm(x)
@@ -37,8 +36,8 @@ class PatchEmbedding(nn.Module):
 
 class MultiHeadSelfAttention(nn.Module):
     def __init__(self, embed_dim, num_heads):
-        # TODO
         super(MultiHeadSelfAttention, self).__init__()
+        
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.head_dim = self.embed_dim // self.num_heads
@@ -52,9 +51,18 @@ class MultiHeadSelfAttention(nn.Module):
         self.attn_dropout = nn.Dropout(0.1)
         self.proj = nn.Linear(self.embed_dim, self.embed_dim)
         self.proj_dropout = nn.Dropout(0)
+    
+     def flash_attn(self, q, k, v):
+        config = self.cuda_config if q.is_cuda else self.cpu_config
+
+        # flash attention - https://arxiv.org/abs/2205.14135
+        
+        with torch.backends.cuda.sdp_kernel(**config._asdict()):
+            out = F.scaled_dot_product_attention(q, k, v)
+
+        return out
 
     def forward(self, x):
-        # TODO
         batch_si, seq_len, emb_dim = x.shape
         qkv = self.qkv(x).reshape(batch_si, seq_len, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv.unbind(0)

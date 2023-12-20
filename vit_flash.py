@@ -136,8 +136,38 @@ class Transformer(nn.Module):
             x = ff(x) + x
         return x
 
+class TransformerBlock(nn.Module):
+    def __init__(self, embed_dim, num_heads, mlp_dim, dropout):
+        # TODO
+        super(TransformerBlock, self).__init__()
+        
+        self.attention = Attention(embed_dim, heads=num_heads)
+        self.attention_norm = nn.LayerNorm(embed_dim)
+        self.mlp = nn.Sequential(nn.Linear(embed_dim, mlp_dim),
+                                  nn.GELU(),
+                                  nn.Dropout(dropout),
+                                  nn.Linear(mlp_dim, embed_dim)
+                                  # nn.Dropout(dropout)
+        )
+        self.mlp_norm = nn.LayerNorm(embed_dim)
+
+
+    def forward(self, x):
+        # TODO
+        res = x
+        x = self.attention_norm(x)
+        x = self.attention(x)
+        x = x + res # residual connection
+        res = x
+        x = self.mlp_norm(x)
+        x = self.mlp(x)
+        x = x + res
+        return x
+
+
 class FlashViT(nn.Module):
-    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, channels = 3, dim_head = 64, use_flash = True):
+    def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim,
+                 channels = 3, dim_head = 64, use_flash = True):
         super().__init__()
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
@@ -147,12 +177,8 @@ class FlashViT(nn.Module):
         num_patches = (image_height // patch_height) * (image_width // patch_width)
         patch_dim = channels * patch_height * patch_width
 
-        self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b h w (p1 p2 c)', p1 = patch_height, p2 = patch_width),
-            nn.LayerNorm(patch_dim),
-            nn.Linear(patch_dim, dim),
-            nn.LayerNorm(dim),
-        )
+        
+        self.patch_embed = PatchEmbedding(image_size, patch_size, in_channels, embed_dim)
 
         self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, use_flash)
 
@@ -165,7 +191,7 @@ class FlashViT(nn.Module):
     def forward(self, img):
         *_, h, w, dtype = *img.shape, img.dtype
 
-        x = self.to_patch_embedding(img)
+        x = self.patch_embed(img)
         pe = posemb_sincos_2d(x)
         x = rearrange(x, 'b ... d -> b (...) d') + pe
 
