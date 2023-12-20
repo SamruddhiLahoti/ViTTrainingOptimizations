@@ -32,7 +32,7 @@ def save_stats(key, stats):
             json.dump(data, file)
             
 
-def train(path, model, criterion, optimizer1, num_epochs, trainloader, testloader, optimizer2=None):
+def train(path, model, criterion, optimizer1, num_epochs, trainloader, testloader, start_epoch=0, optimizer2=None):
     torch.manual_seed(0)
     
 #     scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer1, max_lr=1e-2, steps_per_epoch=len(trainloader), epochs=num_epochs)
@@ -42,7 +42,7 @@ def train(path, model, criterion, optimizer1, num_epochs, trainloader, testloade
     early_stop = False
     step = -1
 
-    pbar = tqdm(range(num_epochs))
+    pbar = tqdm(range(start_epoch, num_epochs))
     
     start = time()
     for epoch in pbar:
@@ -109,3 +109,22 @@ def train(path, model, criterion, optimizer1, num_epochs, trainloader, testloade
     
     print(f"Best Validation Accuracy: {best_val_acc*100:.3f}%")
     print(f"Time to Max Val Accuracy: {tta / 60:.3f} mins")
+
+def train_load(path, model, criterion, optimizer1, num_epochs, trainloader, testloader, optimizer2=None):
+    # Load the saved model checkpoint
+    checkpoint = torch.load(f'saved_models/{path}.pth')
+
+    # Load the components from the checkpoint
+    model.load_state_dict(checkpoint['model'])
+    epoch = checkpoint['epoch']
+    optimizer1 = checkpoint['optimizer1']
+    if optimizer2:
+        optimizer2 = checkpoint['optimizer2']
+    
+    train(path, model, criterion, optimizer1, num_epochs, trainloader, testloader, start_epoch=epoch, optimizer2=optimizer2)
+
+    # Move the model and optimizer(s) to the desired device (e.g., GPU if available)
+#     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#     model.to(device)
+#     optimizer1.to(device)
+#     optimizer2.to(device)
