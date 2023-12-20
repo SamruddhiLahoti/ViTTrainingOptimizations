@@ -9,8 +9,8 @@ def evaluate(model, testloader):
     with torch.no_grad():
         for images, labels in testloader:
 
-            outputs, _ = model(images.cuda())
-            val_acc += (outputs.argmax(dim=1) == labels.cuda()).sum().item()
+            outputs, _ = model(images.to("cuda") )
+            val_acc += (outputs.argmax(dim=1) == labels.to("cuda") ).sum().item()
             total += labels.shape[0]
             
     val_acc = val_acc / total
@@ -53,11 +53,11 @@ def train(path, model, criterion, optimizer1, num_epochs, trainloader, testloade
             model.zero_grad()
             step += 1
 
-            outputs, attentions = model(inputs.cuda())
+            outputs, attentions = model(inputs.to("cuda") )
             if optimizer2:
-                ce_loss, decatt_loss = criterion(outputs, attentions, labels.cuda())
+                ce_loss, decatt_loss = criterion(outputs, attentions, labels.to("cuda") )
             else:
-                ce_loss = criterion(outputs, labels.cuda())
+                ce_loss = criterion(outputs, labels.to("cuda") )
                 decatt_loss = torch.tensor(0)
 
             ce_loss.backward(retain_graph=True)
@@ -67,7 +67,7 @@ def train(path, model, criterion, optimizer1, num_epochs, trainloader, testloade
                 decatt_loss.backward()
                 optimizer2.step()
 
-            epoch_acc += (outputs.argmax(dim=1) == labels.cuda()).sum().item()
+            epoch_acc += (outputs.argmax(dim=1) == labels.to("cuda") ).sum().item()
             epoch_loss += ce_loss.item() + decatt_loss.item()
             total += labels.shape[0]
             

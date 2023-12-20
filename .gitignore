@@ -3,3 +3,11 @@
 **/saved_models/
 **/__pycache__/
 **/.ipynb_checkpoints/
+**/Labels.json
+**/examples/
+**/helpers.py
+**/imagenet.zip
+**/mixed_res/
+**/quadformer.jpg
+**/wget-log
+**/imagenet/

@@ -1,6 +1,14 @@
 import torch
 import torch.nn as nn
 
+from mixed_res.patch_scorers.feature_based_patch_scorer import FeatureBasedPatchScorer
+from mixed_res.patch_scorers.pixel_blur_patch_scorer import PixelBlurPatchScorer
+from mixed_res.patch_scorers.random_patch_scorer import RandomPatchScorer
+
+from mixed_res.quadtree_impl.quadtree_z_curve import ZCurveQuadtreeRunner
+from mixed_res.tokenization.patch_embed import FlatPatchEmbed, PatchEmbed
+from mixed_res.tokenization.tokenizers import QuadtreeTokenizer, VanillaTokenizer
+
 class PatchEmbedding(nn.Module):
     def __init__(self, image_size, patch_size, in_channels, embed_dim):
       # TODO
@@ -93,10 +101,21 @@ class TransformerBlock(nn.Module):
 
 
 class VisionTransformer(nn.Module):
-    def __init__(self, image_size, patch_size, in_channels, embed_dim, num_heads, mlp_dim, num_layers, num_classes, dropout=0.1):
+    def __init__(self, image_size, patch_size, in_channels, embed_dim, num_heads, mlp_dim, num_layers, num_classes, dropout=0.1, mrt=False):
         # TODO
         super(VisionTransformer, self).__init__()
-        self.patch_embed = PatchEmbedding(image_size, patch_size, in_channels, embed_dim)
+        
+        self.mrt = mrt
+        
+        if mrt:
+            self.patch_embed = PatchEmbedding(image_size, patch_size, in_channels, embed_dim)
+        else:
+            self.patch_embed = FlatPatchEmbed(img_size=image_size, patch_size=min_patch_size, embed_dim=embed_dim)
+            self.quadtree_runner = ZCurveQuadtreeRunner(quadtree_num_patches, min_patch_size, max_patch_size)
+            # self.patch_scorer = PixelBlurPatchScorer()
+            self.patch_scorer = FeatureBasedPatchScorer()
+            self.quadtree_tokenizer = QuadtreeTokenizer(self.patch_embed, self.cls_token, self.quadtree_runner, self.patch_scorer)
+        
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.embed_len = self.patch_embed.num_patches + 1
         self.pos_embed = nn.Parameter(torch.zeros(1, self.embed_len, embed_dim))
@@ -118,10 +137,14 @@ class VisionTransformer(nn.Module):
                                 )                           
 
     def forward(self, x):
-        # TODO
-        x = self.patch_embed(x)
-        x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
-        x = x + self.pos_embed
+        
+        if not self.mrt:
+            x = self.patch_embed(x)
+            x = torch.cat((self.cls_token.expand(x.shape[0], -1, -1), x), dim=1)
+            x = x + self.pos_embed
+        else:
+            x = self.quadtree_tokenizer.tokenize(x)
+        
         # x = self.dropout(x)
         # x = self.norm(x)
         A = self.transformer1(x)
@@ -130,3 +153,47 @@ class VisionTransformer(nn.Module):
 
         return x, A
 
+
+class MixedResViT(nn.Module):
+    def __init__(self, image_size, min_patch_size, max_patch_size, quadtree_num_patches,
+                 in_channels, embed_dim, num_heads, mlp_dim, num_layers, num_classes, dropout=0.1, viz=False):
+        super().__init__()
+        self.viz = viz
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+        
+        self.patch_embed = FlatPatchEmbed(img_size=image_size, patch_size=min_patch_size, embed_dim=embed_dim)
+        self.quadtree_runner = ZCurveQuadtreeRunner(quadtree_num_patches, min_patch_size, max_patch_size)
+        # self.patch_scorer = PixelBlurPatchScorer()
+        self.patch_scorer = FeatureBasedPatchScorer()
+        self.quadtree_tokenizer = QuadtreeTokenizer(self.patch_embed, self.cls_token, self.quadtree_runner, self.patch_scorer)
+
+        self.dropout = nn.Dropout(dropout)
+        
+        self.transformer1 = nn.Sequential(*[
+            TransformerBlock(embed_dim, num_heads, mlp_dim, dropout) for i in range(3)
+        ])
+        self.transformer2 = nn.Sequential(*[
+            TransformerBlock(embed_dim, num_heads, mlp_dim, dropout) for i in range(3, num_layers)
+        ])
+        
+        self.norm = nn.LayerNorm(embed_dim)
+        self.cls_head = nn.Sequential(nn.Linear(embed_dim, embed_dim//2),
+                                nn.GELU(),
+                                nn.Dropout(dropout),
+                                nn.Linear(embed_dim // 2, num_classes),
+                                )
+
+    def forward(self, x):
+        x = self.quadtree_tokenizer.tokenize(x)
+        # Visualize positional embeddings
+        if self.viz:
+            print("x.shape:", x.shape) # [batch_size, 1 + num_patches, embed_dim]
+            print()
+            
+        # x = self.dropout(x)
+        # x = self.norm(x)
+        A = self.transformer1(x)
+        x = self.transformer2(A)
+        x = self.cls_head(x[:, 0])
+
+        return x, A
